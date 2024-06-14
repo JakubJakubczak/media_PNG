@@ -19,14 +19,28 @@ def rsa_decrypt(c, priv_key):
     d, n = priv_key
     return pow(c, d, n)
 
+def pad(data, block_size):
+    padding_length = block_size - len(data)
+    padding = bytes([padding_length]) * padding_length
+    return data + padding
+
+def unpad(data):
+    padding_length = data[-1]
+    return data[:-padding_length]
+
 def ecb_encrypt_data(data, pub_key):
-    block_size = (pub_key[1].bit_length()// 8) -1
+    # -1 not working
+    block_size = (pub_key[1].bit_length()// 8) - 11
     print("encryption block size:", block_size)
+    print("data length:", len(data))
+    print("n: ", pub_key[1])
     encrypted_data = []
     for i in range(0, len(data), block_size):
         block = data[i:i+block_size]
+        if len(block) < block_size:
+            block = pad(block, block_size)
         encrypted_block = rsa_encrypt(bytes_to_long(block), pub_key)
-        encrypted_data.append(long_to_bytes(encrypted_block, block_size + 1))
+        encrypted_data.append(long_to_bytes(encrypted_block, (pub_key[1].bit_length() + 7) // 8))
     return b''.join(encrypted_data)
 
 def ecb_decrypt_data(data, priv_key):
@@ -35,9 +49,12 @@ def ecb_decrypt_data(data, priv_key):
     decrypted_data = []
     for i in range(0, len(data), block_size):
         block = data[i:i+block_size]
+       # block_without_pad = data[i+pad:i+block_size]
         decrypted_block = rsa_decrypt(bytes_to_long(block), priv_key)
-        decrypted_data.append(long_to_bytes(decrypted_block, block_size - 1))
-    return b''.join(decrypted_data)
+        decrypted_data.append(long_to_bytes(decrypted_block, block_size))
+
+    decrypted_data = b''.join(decrypted_data)
+    return unpad(decrypted_data)
 
 #method argument for chosing method of encryption, deafult 0 - ecb
 #compresed - whether IDAT data is compressed when encrypting
@@ -68,6 +85,7 @@ def png_encryption(file_path, pub_key, method=0,compressed=1):
                 if compressed == 1:
                     encrypted_data = ecb_encrypt_data(chunk_data,pub_key)
                 else:
+                    #decompressed = zlib.decompressobj().decompress(chunk_data, zlib.MAX_WBITS)
                     decompressed = zlib.decompress(chunk_data)
                     encrypted_data = ecb_encrypt_data(decompressed ,pub_key)
                     encrypted_data = zlib.compress(encrypted_data)

@@ -1,6 +1,6 @@
 from rsa import*
 
-image = "penguin.png"
+image = "mario.png"
 
 pub_key, priv_key = generate_keypair()
 

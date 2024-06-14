@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import zlib
 from png import*
 
-image = "shrek.png"
+image = "mario.png"
 header = get_png_header(image)
 
 print("Header:")
