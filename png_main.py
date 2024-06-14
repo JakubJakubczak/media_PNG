@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import zlib
 from png import*
 
-image = "mario.png"
+image = "sample.png"
 header = get_png_header(image)
 
 print("Header:")
@@ -62,6 +62,56 @@ print("PLTE")
 chunk_text = read_chunk(image,"PLTE")
 if chunk_text:
     print(chunk_text)
+
+#bKGD
+print("bKGD BYTES:")
+chunk_text = read_chunk(image,"bKGD")
+if chunk_text:
+    print(chunk_text)
+#cHRM
+print("cHRM BYTES:")
+chunk_text = read_chunk(image,"cHRM")
+if chunk_text:
+    print(chunk_text)
+    bytes_list = chunk_text.split(' ')
+
+    #cHRM DATA
+
+    white_point_x = int(''.join(bytes_list[:4]),16) /100000
+    white_point_y = int(''.join(bytes_list[4:8]),16) /100000
+    red_x = int(''.join(bytes_list[8:12]),16) /100000
+    red_y = int(''.join(bytes_list[12:16]),16) /100000
+    green_x = int(''.join(bytes_list[16:20]),16) /100000
+    green_y = int(''.join(bytes_list[20:24]),16) /100000
+    blue_x = int(''.join(bytes_list[24:28]),16) /100000
+    blue_y = int(''.join(bytes_list[28:32]),16) /100000
+
+    print("cHRM DATA DECODED:")
+    print("white point x:", white_point_x)
+    print("White point y:", white_point_y)
+    print("Red x:", red_x)
+    print("Red y:", red_y)
+    print("Green x:", green_x)
+    print("Green y:", green_y)
+    print("blue x:", blue_x)
+    print("blue y:", blue_y)
+else:
+    print("cHRM chunk not found")
+
+#gAMA
+print("gAMA BYTES:")
+chunk_text = read_chunk(image,"gAMA")
+if chunk_text:
+    print(chunk_text)
+    bytes_list = chunk_text.split(' ')
+
+    #cHRM DATA
+
+    gamma = int(''.join(bytes_list[:4]),16) /100000
+    print("gAMA DATA DECODED:")
+    print("Gamma:", gamma)
+else:
+    print("gAMA chunk not found")
 
 #Fourier's transformation and visualisation
 # Read the PNG file
