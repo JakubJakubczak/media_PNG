@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import zlib
 from png import*
 
-image = "sample.png"
+image = "queen.png"
 header = get_png_header(image)
 
 print("Header:")
