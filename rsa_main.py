@@ -1,13 +1,13 @@
 from rsa import*
 
-image = "penguin.png"
+image = "shrek.png"
 
 pub_key, priv_key = generate_keypair()
 
-compression = 0
-method = 0
-png_encryption(image,pub_key,method,compression )
-png_decryption(image.replace('.png', 'encryption.png'),priv_key,method,compression)
+compression = 1
+method = 1
+data,IV = png_encryption(image,pub_key,method,compression)
+png_decryption(image.replace('.png', 'encryption.png'),priv_key,method,compression,IV)
 
 print("Koniec")
 
