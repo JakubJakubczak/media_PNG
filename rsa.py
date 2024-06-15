@@ -6,7 +6,6 @@ def generate_keypair(bits=2048):
     e = 65537
     p = getPrime(bits // 2)
     q = getPrime(bits // 2)
-    print(p,q)
     n = p * q
     phi = (p - 1) * (q - 1)
     d = inverse(e, phi)
@@ -89,6 +88,9 @@ def png_encryption(file_path, pub_key, method=0,compressed=1):
         if header != b'\x89PNG\r\n\x1a\n':
             raise ValueError("File is not a valid PNG")
         outfile.write(header)
+        idat_data = b''
+        skip = 0
+        #concatenate all idat data
         while True:
 
             chunk_length_encoded = infile.read(4)
@@ -102,25 +104,51 @@ def png_encryption(file_path, pub_key, method=0,compressed=1):
             chunk_type_decoded = chunk_type.decode('ascii')
             # Check if chunk is IDAT, if its IDAT encode it
             if chunk_type == b'IDAT':
-                print(f"IDAT CHUNK, ENCRYPTING:")
-                if compressed == 1:
-                    encrypted_data = ecb_encrypt_data(chunk_data,pub_key)
-                else:
-                    #decompressed = zlib.decompressobj().decompress(chunk_data, zlib.MAX_WBITS)
-                    # decompressor = zlib.decompressobj()
-                    # decompressed = decompressor.decompress(chunk_data)
-                    # decompressor.flush()
+                print(f"IDAT CHUNK, contatenating:")
+                idat_data += chunk_data
 
-                    decompressed = zlib.decompress(chunk_data)
-                    encrypted_data = ecb_encrypt_data(decompressed ,pub_key)
-                    encrypted_data = zlib.compress(encrypted_data)
+        infile.seek(8)
+        print("seek")
+        while True:
+            chunk_length_encoded = infile.read(4)
+            if len(chunk_length_encoded) < 4:
+                break  # End of file reached
 
-                encrypted_length_encoded = len(encrypted_data).to_bytes(4, byteorder='big')
-                chunk_crc = calculate_crc(chunk_type, encrypted_data).to_bytes(4, byteorder='big')
-                outfile.write(encrypted_length_encoded)
-                outfile.write(chunk_type)
-                outfile.write(encrypted_data)
-                outfile.write(chunk_crc)
+
+            chunk_length = int.from_bytes(chunk_length_encoded, byteorder='big')
+            chunk_type = infile.read(4)
+            chunk_data = infile.read(chunk_length)
+            chunk_crc = infile.read(4)
+            chunk_type_decoded = chunk_type.decode('ascii')
+            # Check if chunk is IDAT, if its IDAT encode it
+
+            if chunk_type == b'IDAT':
+                print("IDAT")
+                if skip == 0:
+                    print(f"IDAT CHUNK, ENCRYPTING:")
+                    if compressed == 1:
+                        encrypted_data = ecb_encrypt_data(idat_data, pub_key)
+                    else:
+                        # decompressed = zlib.decompressobj().decompress(chunk_data, zlib.MAX_WBITS)
+                        # decompressor = zlib.decompressobj()
+                        # decompressed = decompressor.decompress(chunk_data)
+                        # decompressor.flush()
+
+                        decompressed = zlib.decompress(idat_data)
+                        encrypted_data = ecb_encrypt_data(decompressed, pub_key)
+                        encrypted_data = zlib.compress(encrypted_data)
+                    # Split the encrypted data back into IDAT chunks
+                    max_chunk_size = 8192  # PNG standard maximum chunk size
+                    for i in range(0, len(encrypted_data), max_chunk_size):
+                        chunk = encrypted_data[i:i + max_chunk_size]
+                        chunk_length_encoded = len(chunk).to_bytes(4, byteorder='big')
+                        chunk_crc = calculate_crc(b'IDAT', chunk).to_bytes(4, byteorder='big')
+                        outfile.write(chunk_length_encoded)
+                        outfile.write(b'IDAT')
+                        outfile.write(chunk)
+                        outfile.write(chunk_crc)
+
+                    skip = 1
             else:
                 print(f"NOT IDAT, NOT ENCRYPTED:")
                 # Write the chunk length, type, data, and CRC to the output file
@@ -128,6 +156,16 @@ def png_encryption(file_path, pub_key, method=0,compressed=1):
                 outfile.write(chunk_type)
                 outfile.write(chunk_data)
                 outfile.write(chunk_crc)
+
+
+            # encrypted_length_encoded = len(encrypted_data).to_bytes(4, byteorder='big')
+            # chunk_crc = calculate_crc(chunk_type, encrypted_data).to_bytes(4, byteorder='big')
+            # outfile.write(encrypted_length_encoded)
+            # outfile.write(chunk_type)
+            # outfile.write(encrypted_data)
+            # outfile.write(chunk_crc)
+
+
 
     # Read the modified file and return its bytes
     with open(output_path, 'rb') as file:
@@ -144,7 +182,9 @@ def png_decryption(file_path, priv_key,method=0,compressed=1):
         if header != b'\x89PNG\r\n\x1a\n':
             raise ValueError("File is not a valid PNG")
         outfile.write(header)
-
+        idat_data = b''
+        skip = 0
+        # concatenate all idat data
         while True:
 
             chunk_length_encoded = infile.read(4)
@@ -156,23 +196,49 @@ def png_decryption(file_path, priv_key,method=0,compressed=1):
             chunk_data = infile.read(chunk_length)
             chunk_crc = infile.read(4)
             chunk_type_decoded = chunk_type.decode('ascii')
+            if chunk_type == b'IDAT':
+                print(f"IDAT CHUNK, contatenating:")
+                idat_data += chunk_data
+
+        infile.seek(8)
+        while True:
+            chunk_length_encoded = infile.read(4)
+            if len(chunk_length_encoded) < 4:
+                break  # End of file reached
+
+            chunk_length = int.from_bytes(chunk_length_encoded, byteorder='big')
+            chunk_type = infile.read(4)
+            chunk_data = infile.read(chunk_length)
+            chunk_crc = infile.read(4)
+            chunk_type_decoded = chunk_type.decode('ascii')
             # Check if chunk is IDAT, if its IDAT decode it
             if chunk_type == b'IDAT':
-                print(f"IDAT CHUNK, DECRYPTION:")
-                if compressed == 1:
-                    decrypted_data = ecb_decrypt_data(chunk_data,priv_key)
-                else:
-                    decompressed = zlib.decompress(chunk_data)
-                    decrypted_data = ecb_decrypt_data(decompressed, priv_key)
-                    decrypted_data = zlib.compress(decrypted_data)
+                if skip == 0:
+                    print(f"IDAT CHUNK, DECRYPTING:")
+                    if compressed == 1:
+                        decrypted_data = ecb_decrypt_data(idat_data, priv_key)
+                    else:
+                        # decompressed = zlib.decompressobj().decompress(chunk_data, zlib.MAX_WBITS)
+                        # decompressor = zlib.decompressobj()
+                        # decompressed = decompressor.decompress(chunk_data)
+                        # decompressor.flush()
 
-                decrypted_length_encoded = len(decrypted_data).to_bytes(4, byteorder='big')
-                #calculatin new crc
-                chunk_crc = calculate_crc(chunk_type, decrypted_data).to_bytes(4, byteorder='big')
-                outfile.write(decrypted_length_encoded)
-                outfile.write(chunk_type)
-                outfile.write(decrypted_data)
-                outfile.write(chunk_crc)
+                        decompressed = zlib.decompress(idat_data)
+                        decrypted_data = ecb_decrypt_data(decompressed, priv_key)
+                        decrypted_data = zlib.compress(decrypted_data)
+                    # Split the encrypted data back into IDAT chunks
+                    max_chunk_size = 8192  # PNG standard maximum chunk size
+                    for i in range(0, len(decrypted_data), max_chunk_size):
+                        chunk = decrypted_data[i:i + max_chunk_size]
+                        chunk_length_encoded = len(chunk).to_bytes(4, byteorder='big')
+                        chunk_crc = calculate_crc(b'IDAT', chunk).to_bytes(4, byteorder='big')
+                        outfile.write(chunk_length_encoded)
+                        outfile.write(b'IDAT')
+                        outfile.write(chunk)
+                        outfile.write(chunk_crc)
+
+                    skip = 1
+
             else:
                 print(f"NOT IDAT, NOT DECRYPTED:")
                 # Write the chunk length, type, data, and CRC to the output file
@@ -181,6 +247,32 @@ def png_decryption(file_path, priv_key,method=0,compressed=1):
                 outfile.write(chunk_data)
                 outfile.write(chunk_crc)
 
+        # if idat_data:
+        #     if compressed == 1:
+        #         decrypted_data = ecb_decrypt_data(idat_data, priv_key)
+        #     else:
+        #         decompressed = zlib.decompress(idat_data)
+        #         decrypted_data = ecb_decrypt_data(decompressed, priv_key)
+        #         decrypted_data = zlib.compress(decrypted_data)
+        #
+        #     # decrypted_length_encoded = len(decrypted_data).to_bytes(4, byteorder='big')
+        #     # # calculatin new crc
+        #     # chunk_crc = calculate_crc(chunk_type, decrypted_data).to_bytes(4, byteorder='big')
+        #     # outfile.write(decrypted_length_encoded)
+        #     # outfile.write(chunk_type)
+        #     # outfile.write(decrypted_data)
+        #     # outfile.write(chunk_crc)
+        #
+        #     # Split the decrypted data back into IDAT chunks
+        #     max_chunk_size = 8192  # PNG standard maximum chunk size
+        #     for i in range(0, len(decrypted_data), max_chunk_size):
+        #         chunk = decrypted_data[i:i + max_chunk_size]
+        #         chunk_length_encoded = len(chunk).to_bytes(4, byteorder='big')
+        #         chunk_crc = calculate_crc(b'IDAT', chunk).to_bytes(4, byteorder='big')
+        #         outfile.write(chunk_length_encoded)
+        #         outfile.write(b'IDAT')
+        #         outfile.write(chunk)
+        #         outfile.write(chunk_crc)
     # Read the modified file and return its bytes
     with open(output_path, 'rb') as file:
         decrypted_png_data = file.read()
