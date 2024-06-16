@@ -1,14 +1,17 @@
-from rsa import*
+from rsa_c import*
 
-image = "shrek.png"
+image = "queen.png"
 
 pub_key, priv_key = generate_keypair()
+pub_rsa, priv_rsa = generate_rsa_keypair()
 
 compression = 1
 method = 1
-data,IV = png_encryption(image,pub_key,method,compression)
-png_decryption(image.replace('.png', 'encryption.png'),priv_key,method,compression,IV)
 
+data,IV = png_encryption(image,pub_key,method,compression)
+data2,IV2 = png_rsa_encryption(image,pub_rsa,method,compression)
+png_decryption(image.replace('.png', 'encryption.png'),priv_key,method,compression,IV)
+png_rsa_decryption(image.replace('.png', 'rsa_encryption.png'),priv_rsa,method,compression,IV2)
 print("Koniec")
 
 
@@ -20,4 +23,4 @@ print("Koniec")
 # dla penguin nie dziala zdekompersowane  - ZROBIONE!!!
 
 # inna metoda szyfrowania oprocz ecb
-# szyfrowac gotowa funkcja rsa
+# szyfrowac gotowa funkcja rsa ZROBIONE!!!
